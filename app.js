@@ -220,17 +220,6 @@ function importData(file, mode) {
   });
 }
 
-function markdownToHtml(text) {
-  return text
-    .replace(/^### (.*)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.*)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.*)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.*?)\*/g, '<em>$1</em>')
-    .replace(/^- (.*)$/gm, '<li>$1</li>')
-    .replace(/\n/g, '<br>');
-}
-
 // ─── Date formatting ──────────────────────────────────────────────────────────
 function formatDate(iso) {
   try {
@@ -400,7 +389,7 @@ function renderIdeaCard(idea, opts = {}) {
       </div>
       ${idea.description ? `
         <div class="card-description-wrap">
-          <p class="card-description markdown-content" data-idea-id="${idea.id}" data-expanded="false">${esc(preview)}</p>
+          <p class="card-description" data-idea-id="${idea.id}" data-expanded="false">${esc(preview)}</p>
           ${isLong ? `<button class="btn-show-more" data-action="toggle-expand-desc" data-idea-id="${idea.id}" data-full="${esc(idea.description)}" data-preview="${esc(preview)}">${IC.chevronDownXs} Show more</button>` : ''}
         </div>` : ''}
       ${idea.tags.length > 0 ? `

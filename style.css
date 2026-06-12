@@ -778,7 +778,12 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 }
 .form-input::placeholder, .form-textarea::placeholder { color: var(--muted-foreground); }
 .form-input:focus, .form-textarea:focus, .form-select:focus { box-shadow: 0 0 0 2px var(--ring); border-color: var(--ring); }
-.form-textarea { resize: none; line-height: 1.6; }
+.form-textarea {
+  resize: none;
+  overflow-y: hidden;
+  min-height: 200px;
+  line-height: 1.6;
+}
 .form-error { font-size: 0.75rem; color: var(--destructive); margin-top: 4px; }
 .form-hint { font-size: 0.75rem; color: var(--muted-foreground); margin-top: 4px; }
 

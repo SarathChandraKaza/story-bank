@@ -234,6 +234,21 @@ function formatDateTime(iso) {
   } catch { return ''; }
 }
 
+// ----Auto resize description text area --------//
+function setupAutoResizeTextarea() {
+  const textarea = document.getElementById('idea-description');
+
+  if (!textarea) return;
+
+  textarea.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  });
+
+  textarea.style.height = 'auto';
+  textarea.style.height = textarea.scrollHeight + 'px';
+}
+
 // ─── State ────────────────────────────────────────────────────────────────────
 const state = {
   ideas: [],
@@ -577,8 +592,19 @@ function openIdeaForm(idea = null) {
   form.querySelector('[name=description]').value = idea?.description ?? '';
   form.querySelector('[name=tagsRaw]').value     = idea?.tags.join(', ') ?? '';
   form.querySelector('.form-error')?.remove();
-  openModal('modal-idea-form');
-  setTimeout(() => form.querySelector('[name=title]').focus(), 60);
+    openModal('modal-idea-form');
+
+    setupAutoResizeTextarea();
+
+    setTimeout(() => {
+      form.querySelector('[name=title]').focus();
+
+      const textarea = document.getElementById('idea-description');
+      if (textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = textarea.scrollHeight + 'px';
+      }
+    }, 60);
 }
 
 // ── Group form

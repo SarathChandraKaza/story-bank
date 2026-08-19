@@ -283,13 +283,22 @@ function setupAutoResizeTextarea() {
 
   if (!textarea) return;
 
-  textarea.addEventListener('input', () => {
+  const resize = () => {
     textarea.style.height = 'auto';
     textarea.style.height = textarea.scrollHeight + 'px';
-  });
 
-  textarea.style.height = 'auto';
-  textarea.style.height = textarea.scrollHeight + 'px';
+    // Keep the typing position visible on mobile
+    requestAnimationFrame(() => {
+      textarea.scrollIntoView({
+        behavior: 'instant',
+        block: 'nearest'
+      });
+    });
+  };
+
+  textarea.oninput = resize;
+
+  resize();
 }
 
 // ─── State ────────────────────────────────────────────────────────────────────

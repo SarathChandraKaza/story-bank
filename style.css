@@ -753,8 +753,15 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
 .modal-body {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
   padding: 16px 20px;
+  -webkit-overflow-scrolling: touch;
 }
+
+.modal-body form {
+  min-height: 0;
+}
+
 .modal-footer {
   padding: 12px 20px 20px;
   border-top: 1px solid var(--border);
@@ -782,6 +789,7 @@ input[type="search"]::-webkit-search-cancel-button { display: none; }
   resize: none;
   overflow-y: hidden;
   min-height: 200px;
+  height: auto;
   line-height: 1.6;
 }
 .form-error { font-size: 0.75rem; color: var(--destructive); margin-top: 4px; }

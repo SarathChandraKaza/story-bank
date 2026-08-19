@@ -60,7 +60,7 @@ function loadData() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.ideas) && Array.isArray(parsed.groups)) {
-        parsed.ideas = parsed.ideas.map(i => ({ ...i, versions: i.versions ?? [] }));
+        parsed.ideas = parsed.ideas.map(i => ({ ...i, versions: i.versions ?? [], archived: i.archived ?? false, archivedAt: i.archivedAt ?? null }));
         return parsed;
       }
     }
@@ -83,7 +83,18 @@ function saveData(data) {
 function addIdea({ title, description, type, tags }) {
   const data = loadData();
   const now  = new Date().toISOString();
-  const idea = { id: genId(), title, description, type, tags, createdAt: now, updatedAt: now, versions: [] };
+  const idea = {
+  id: genId(),
+  title,
+  description,
+  type,
+  tags,
+  createdAt: now,
+  updatedAt: now,
+  versions: [],
+  archived: false,
+  archivedAt: null
+    };
   data.ideas = [idea, ...data.ideas];
   saveData(data);
   return idea;
@@ -118,6 +129,38 @@ function deleteIdea(id) {
   data.ideas  = data.ideas.filter(i => i.id !== id);
   data.groups = data.groups.map(g => ({ ...g, items: g.items.filter(item => !(item.type === 'idea' && item.id === id)) }));
   saveData(data);
+}
+
+function archiveIdea(id) {
+  const data = loadData();
+  const idx = data.ideas.findIndex(i => i.id === id);
+
+  if (idx === -1) return null;
+
+  data.ideas[idx] = {
+    ...data.ideas[idx],
+    archived: true,
+    archivedAt: new Date().toISOString()
+  };
+
+  saveData(data);
+  return data.ideas[idx];
+}
+
+function restoreArchivedIdea(id) {
+  const data = loadData();
+  const idx = data.ideas.findIndex(i => i.id === id);
+
+  if (idx === -1) return null;
+
+  data.ideas[idx] = {
+    ...data.ideas[idx],
+    archived: false,
+    archivedAt: null
+  };
+
+  saveData(data);
+  return data.ideas[idx];
 }
 
 function addGroup(name, description) {
@@ -203,7 +246,7 @@ function importData(file, mode) {
         if (Array.isArray(parsed)) {
           incoming = { ideas: parsed.map(i => ({ ...i, versions: i.versions ?? [] })), groups: [] };
         } else if (parsed && Array.isArray(parsed.ideas)) {
-          incoming = { ideas: parsed.ideas.map(i => ({ ...i, versions: i.versions ?? [] })), groups: Array.isArray(parsed.groups) ? parsed.groups : [] };
+          incoming = { ideas: parsed.ideas.map(i => ({ ...i, versions: i.versions ?? [], archived: i.archived ?? false, archivedAt: i.archivedAt ?? null })), groups: Array.isArray(parsed.groups) ? parsed.groups : [] };
         } else throw new Error('Invalid format');
         if (mode === 'replace') { saveData(incoming); resolve(incoming); }
         else {
@@ -254,6 +297,7 @@ const state = {
   ideas: [],
   groups: [],
   selectedGroupId: null,
+  showArchive: false,
   sidebarOpen: false,
   search: '',
   typeFilter: '',
@@ -311,7 +355,8 @@ function matchesFilter(idea) {
   const matchSearch = !q || idea.title.toLowerCase().includes(q) || idea.description.toLowerCase().includes(q);
   const matchType   = !state.typeFilter || idea.type === state.typeFilter;
   const matchTag    = !state.tagFilter  || idea.tags.some(t => t.toLowerCase().includes(state.tagFilter.toLowerCase().trim()));
-  return matchSearch && matchType && matchTag;
+  const matchArchive = state.showArchive ? idea.archived : !idea.archived;
+  return matchSearch && matchType && matchTag && matchArchive;
 }
 
 function allTags() {
@@ -349,16 +394,21 @@ function renderGroupRow(group, depth = 0) {
 function renderSidebar(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
-  const totalIdeas = state.ideas.length;
+    const totalIdeas = state.ideas.filter(i => !i.archived).length;
+    const archivedIdeas = state.ideas.filter(i => i.archived).length;
   const groupsHtml = state.groups.length === 0
     ? `<button class="btn-create-first-group" data-action="open-group-form">+ Create your first group</button>`
     : `<div class="groups-list">${state.groups.map(g => renderGroupRow(g)).join('')}</div>`;
 
   el.innerHTML = `
     <nav class="sidebar-nav">
-      <button class="btn-all-ideas${state.selectedGroupId === null ? ' active' : ''}" data-action="select-all-ideas">
-        ${IC.book} <span>All Ideas</span> <span class="all-ideas-count">${totalIdeas}</span>
-      </button>
+        <button class="btn-all-ideas${state.selectedGroupId === null && !state.showArchive ? ' active' : ''}" data-action="select-all-ideas">
+          ${IC.book} <span>All Ideas</span> <span class="all-ideas-count">${totalIdeas}</span>
+        </button>
+
+        <button class="btn-all-ideas${state.showArchive ? ' active' : ''}" data-action="select-archive">
+          ${IC.rotateCcw} <span>Archive</span> <span class="all-ideas-count">${archivedIdeas}</span>
+        </button>
       <div class="groups-header">
         <span class="groups-label">Groups</span>
         <button class="btn-create-group-sidebar" data-action="open-group-form" aria-label="Create group">${IC.plusSm}</button>
@@ -409,14 +459,32 @@ function renderIdeaCard(idea, opts = {}) {
         </div>` : ''}
       ${idea.tags.length > 0 ? `
         <div class="card-tags">${idea.tags.map(t => `<span class="tag-pill">#${esc(t)}</span>`).join('')}</div>` : ''}
-      <div class="card-actions">
-        <button class="card-action-btn" data-action="edit-idea" data-idea-id="${idea.id}">${IC.pencil} Edit</button>
-        <button class="card-action-btn" data-action="open-versions" data-idea-id="${idea.id}">${IC.history} Versions${idea.versions.length > 0 ? ` (${idea.versions.length})` : ''}</button>
-        <button class="card-action-btn" data-action="export-idea" data-idea-id="${idea.id}">${IC.downloadXs} Export</button>
-        ${addGroupBtn}
-        ${removeBtn}
-        <button class="card-action-btn danger${!parentGroupId ? ' ml-auto' : ''}" data-action="delete-idea" data-idea-id="${idea.id}">${IC.trash} Delete</button>
-      </div>
+      
+        <div class="card-actions">
+          <button class="card-action-btn" data-action="edit-idea" data-idea-id="${idea.id}">${IC.pencil} Edit</button>
+
+          <button class="card-action-btn" data-action="open-versions" data-idea-id="${idea.id}">
+            ${IC.history} Versions${idea.versions.length > 0 ? ` (${idea.versions.length})` : ''}
+          </button>
+
+          <button class="card-action-btn" data-action="export-idea" data-idea-id="${idea.id}">
+            ${IC.downloadXs} Export
+          </button>
+
+          ${addGroupBtn}
+
+          ${removeBtn}
+
+          ${idea.archived
+            ? `<button class="card-action-btn" data-action="restore-idea" data-idea-id="${idea.id}">${IC.rotateCcw} Restore</button>`
+            : `<button class="card-action-btn" data-action="archive-idea" data-idea-id="${idea.id}">Archive</button>`
+          }
+
+          <button class="card-action-btn danger${!parentGroupId ? ' ml-auto' : ''}" data-action="delete-idea" data-idea-id="${idea.id}">
+            ${IC.trash} Delete
+          </button>
+        </div>
+
     </article>`;
 }
 
@@ -472,11 +540,13 @@ function renderMain() {
       </div>`;
   } else {
     const filtered = state.ideas.filter(matchesFilter);
-    const total    = state.ideas.length;
+    const total    = state.ideas.filter(i => !i.archived).length;
     const label    = total > 0
       ? (filtered.length === total ? `${total} idea${total !== 1 ? 's' : ''}` : `${filtered.length} of ${total} ideas`)
       : 'All Ideas';
-    breadcrumbHtml = `<div class="breadcrumb"><span class="breadcrumb-current">${esc(label)}</span></div><div></div>`;
+    breadcrumbHtml = state.showArchive
+    ? `<div class="breadcrumb"><span class="breadcrumb-current">Archive</span></div><div></div>`
+    : `<div class="breadcrumb"><span class="breadcrumb-current">${esc(label)}</span></div><div></div>`;
   }
 
   // Content area
@@ -509,8 +579,16 @@ function renderMain() {
     }
   } else {
     const filtered = state.ideas.filter(matchesFilter);
-    if (filtered.length === 0) {
-      if (state.ideas.length === 0) {
+    
+        if (filtered.length === 0) {
+      if (state.showArchive) {
+        contentHtml = `
+          <div class="empty-state animate-fade-in">
+            <div class="empty-icon">${IC.rotateCcw}</div>
+            <h2 class="empty-title">Archive is empty</h2>
+            <p class="empty-desc">Ideas you archive will appear here.</p>
+          </div>`;
+      } else if (state.ideas.filter(i => !i.archived).length === 0) {
         contentHtml = `
           <div class="empty-state animate-fade-in">
             <div class="empty-icon">${IC.book}</div>
@@ -720,9 +798,16 @@ function handleAction(action, el) {
   switch (action) {
     // ── Navigation
     case 'select-all-ideas':
-      state.selectedGroupId = null; state.sidebarOpen = false;
+      state.selectedGroupId = null;  state.showArchive = false; state.sidebarOpen = false;
       document.getElementById('sidebar-mobile-overlay').classList.add('hidden');
       renderAll(); break;
+    case 'select-archive':
+      state.selectedGroupId = null;
+      state.showArchive = true;
+      state.sidebarOpen = false;
+      document.getElementById('sidebar-mobile-overlay').classList.add('hidden');
+      renderAll();
+      break;
     case 'select-group':
       state.selectedGroupId = groupId; state.sidebarOpen = false;
       document.getElementById('sidebar-mobile-overlay').classList.add('hidden');
@@ -736,6 +821,29 @@ function handleAction(action, el) {
     case 'edit-idea': {
       const idea = state.ideas.find(i => i.id === ideaId);
       if (idea) openIdeaForm(idea); break;
+    }
+    case 'archive-idea': {
+    const idea = state.ideas.find(i => i.id === ideaId);
+
+      if (idea) {
+        archiveIdea(idea.id);
+        showToast(`Archived: ${idea.title}`);
+        refreshData();
+        renderAll();
+      }
+      break;
+    }
+
+    case 'restore-idea': {
+    const idea = state.ideas.find(i => i.id === ideaId);
+
+     if (idea) {
+        restoreArchivedIdea(idea.id);
+        showToast(`Restored: ${idea.title}`);
+        refreshData();
+        renderAll();
+     }
+     break;
     }
     case 'delete-idea': {
       const idea = state.ideas.find(i => i.id === ideaId);
